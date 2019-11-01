@@ -1,11 +1,13 @@
 package main
 
 import (
+	"bufio"
 	"bytes"
 	"encoding/base64"
 	"encoding/hex"
 	"fmt"
 	"log"
+	"os"
 	"sort"
 	"strings"
 	"unicode"
@@ -70,14 +72,20 @@ func xor(a, b []byte) []byte {
 	return ret
 }
 
-func ex3(encoded []byte) {
-	type decryptedBytes struct {
-		b     []byte
-		score int
-		key   byte
-	}
+func ex3(e []byte) {
+	decrypted := decryptEncoded(e)
+	fmt.Printf("decrypted: %s, key: %x\n", decrypted.b, decrypted.key)
+}
+
+type decryptedBytes struct {
+	b     []byte
+	score int
+	key   byte
+}
+
+func decryptEncoded(e []byte) decryptedBytes {
+	decoded := decodeHex(e)
 	var best decryptedBytes
-	decoded := decodeHex(encoded)
 	for i := 0; i < 256; i++ {
 		dec := make([]byte, len(decoded))
 		for j := 0; j < len(dec); j++ {
@@ -88,7 +96,7 @@ func ex3(encoded []byte) {
 			best = decryptedBytes{dec, s, byte(i)}
 		}
 	}
-	fmt.Printf("decrypted: %s, key: %x\n", best.b, best.key)
+	return best
 }
 
 type pair struct {
@@ -132,16 +140,31 @@ func frequencyAnalysisScore(str []byte) int {
 			case 'E', 'T', 'A', 'O', 'I', 'N':
 				score++
 			}
-			switch sorted[len(sorted)-1-i].Key {
-			case 'V', 'K', 'J', 'X', 'Q', 'Z':
-				score++
-			}
 		}
 	}
 	return score
 }
 
-func ex4() {}
+func ex4() {
+	file, err := os.Open("ex4.txt")
+	if err != nil {
+		log.Fatal(err)
+	}
+	defer file.Close()
+	var best decryptedBytes
+	r := bufio.NewReader(file)
+	for {
+		b, _, err := r.ReadLine()
+		if err != nil {
+			break
+		}
+		decrypted := decryptEncoded(b)
+		if decrypted.score > best.score {
+			best = decrypted
+		}
+	}
+	fmt.Printf("decrypted: %s, score: %d, key: %x\n", best.b, best.score, best.key)
+}
 
 func ex5() {}
 
