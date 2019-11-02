@@ -28,7 +28,7 @@ func main() {
 	ex4()
 
 	fmt.Println("exercise 5: ")
-	ex5()
+	ex5([]byte("Burning 'em, if you ain't quick and nimble\nI go crazy when I hear a cymbal"))
 
 	fmt.Println("exercise 6: ")
 	ex6()
@@ -41,6 +41,7 @@ func main() {
 
 }
 
+// Convert hex to base64
 func ex1(s []byte) {
 	encoded := base64.StdEncoding.EncodeToString(decodeHex(s))
 	fmt.Println(encoded)
@@ -55,6 +56,7 @@ func decodeHex(b []byte) []byte {
 	return dst
 }
 
+// Fixed XOR
 func ex2(a, b *bytes.Buffer) {
 	if a.Len() != b.Len() {
 		log.Fatal("buffers must be of equal length")
@@ -72,6 +74,7 @@ func xor(a, b []byte) []byte {
 	return ret
 }
 
+// Single-byte XOR cipher
 func ex3(e []byte) {
 	decrypted := decryptEncoded(e)
 	fmt.Printf("decrypted: %s, key: %x\n", decrypted.b, decrypted.key)
@@ -97,6 +100,28 @@ func decryptEncoded(e []byte) decryptedBytes {
 		}
 	}
 	return best
+}
+
+// Detect single-character XOR
+func ex4() {
+	file, err := os.Open("ex4.txt")
+	if err != nil {
+		log.Fatal(err)
+	}
+	defer file.Close()
+	var best decryptedBytes
+	r := bufio.NewReader(file)
+	for {
+		b, _, err := r.ReadLine()
+		if err != nil {
+			break
+		}
+		decrypted := decryptEncoded(b)
+		if decrypted.score > best.score {
+			best = decrypted
+		}
+	}
+	fmt.Printf("decrypted: %s, score: %d, key: %x\n", best.b, best.score, best.key)
 }
 
 type pair struct {
@@ -145,28 +170,17 @@ func frequencyAnalysisScore(str []byte) int {
 	return score
 }
 
-func ex4() {
-	file, err := os.Open("ex4.txt")
-	if err != nil {
-		log.Fatal(err)
+// Repeating-key XOR
+func ex5(s []byte) {
+	key := []byte("ICE")
+	encrypted := make([]byte, len(s))
+	for i := 0; i < len(s); i++ {
+		encrypted[i] = s[i] ^ key[i%len(key)]
 	}
-	defer file.Close()
-	var best decryptedBytes
-	r := bufio.NewReader(file)
-	for {
-		b, _, err := r.ReadLine()
-		if err != nil {
-			break
-		}
-		decrypted := decryptEncoded(b)
-		if decrypted.score > best.score {
-			best = decrypted
-		}
-	}
-	fmt.Printf("decrypted: %s, score: %d, key: %x\n", best.b, best.score, best.key)
+	encoded := make([]byte, hex.EncodedLen(len(encrypted)))
+	hex.Encode(encoded, encrypted)
+	fmt.Printf("encrypted: %s\n", encoded)
 }
-
-func ex5() {}
 
 func ex6() {}
 
