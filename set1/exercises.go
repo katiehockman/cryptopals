@@ -7,6 +7,8 @@ import (
 	"encoding/hex"
 	"fmt"
 	"log"
+	"math"
+	"math/bits"
 	"os"
 	"sort"
 	"strings"
@@ -22,7 +24,6 @@ func main() {
 
 	fmt.Println("exercise 3: ")
 	ex3([]byte("1b37373331363f78151b7f2b783431333d78397828372d363c78373e783a393b3736"))
-	// score([]byte("Cooking MC's like a pound of bacon"))
 
 	fmt.Println("exercise 4: ")
 	ex4()
@@ -32,6 +33,7 @@ func main() {
 
 	fmt.Println("exercise 6: ")
 	ex6()
+	hammingDistance([]byte("this is a test"), []byte("wokka wokka!!!"))
 
 	fmt.Println("exercise 7: ")
 	ex7()
@@ -104,13 +106,8 @@ func decryptEncoded(e []byte) decryptedBytes {
 
 // Detect single-character XOR
 func ex4() {
-	file, err := os.Open("ex4.txt")
-	if err != nil {
-		log.Fatal(err)
-	}
-	defer file.Close()
+	r := fileReader("ex4.txt")
 	var best decryptedBytes
-	r := bufio.NewReader(file)
 	for {
 		b, _, err := r.ReadLine()
 		if err != nil {
@@ -122,6 +119,15 @@ func ex4() {
 		}
 	}
 	fmt.Printf("decrypted: %s, score: %d, key: %x\n", best.b, best.score, best.key)
+}
+
+func fileReader(filename string) *bufio.Reader {
+	file, err := os.Open(filename)
+	if err != nil {
+		log.Fatal(err)
+	}
+	defer file.Close()
+	return bufio.NewReader(file)
 }
 
 type pair struct {
@@ -184,6 +190,47 @@ func ex5(s []byte) {
 
 func ex6() {}
 
-func ex7() {}
+func hammingDistance(a, b []byte) int {
+	if len(a) != len(b) {
+		log.Fatal("byte slices must be of equal length to calculate Hamming distance")
+	}
+	var dist int
+	for _, x := range xor(a, b) {
+		// Maybe do this the hard way for learning, but *shrug*
+		dist += bits.OnesCount8(x)
+	}
+	return dist
+}
+
+func ex7() {
+	r := fileReader("ex6.txt")
+	keyLen := bestKeyLen(r)
+}
+
+func bestKeyLen(r *bufio.Reader) int {
+	var likeliestKeyLen int
+	lowestHammingDist := math.MaxInt8
+	maxKeyLen := 40
+	n := 2
+	bytes, err := r.Peek(maxKeyLen * n)
+	if err != nil {
+		log.Fatal(err)
+	}
+	for keyLen := 2; keyLen < maxKeyLen; keyLen++ {
+		totalDist := 0
+		for i := 0; i < n; i++ {
+			first := bytes[keyLen*i : keyLen*(i+1)]
+			second := bytes[keyLen*(i+1) : keyLen*(i+2)]
+			totalDist += hammingDistance(first, second)
+		}
+		av := totalDist / n
+		normalized := av / keyLen
+		if normalized < lowestHammingDist {
+			lowestHammingDist = normalized
+			likeliestKeyLen = keyLen
+		}
+	}
+	return likeliestKeyLen
+}
 
 func ex8() {}
