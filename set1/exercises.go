@@ -222,37 +222,46 @@ func ex6(charFreq map[byte]int) {
 		log.Fatal(err)
 	}
 	encrypted := decodeBase64(fileBytes)
-	keyLen := estimateKeyLen(encrypted)
-
-	var (
-		key       = make([]byte, keyLen)
-		decrypted = make([]byte, len(encrypted))
-		blocks    [][]byte
-	)
-
-	i := 0
-	for {
-		if i > len(encrypted)-keyLen {
-			// blocks = append(blocks, encrypted[i:len(encrypted)])
-			break
+	var bestKey []byte
+	var bestKeyScore float64
+	for keyLen := 2; keyLen < 35; keyLen++ {
+		key := make([]byte, keyLen)
+		keyScore := 0.0
+		var blocks [][]byte
+		i := 0
+		for {
+			if i > len(encrypted)-keyLen {
+				break
+			}
+			blocks = append(blocks, encrypted[i:i+keyLen])
+			i += keyLen
 		}
-		blocks = append(blocks, encrypted[i:i+keyLen])
-		i += keyLen
+
+		for k := 0; k < keyLen; k++ {
+			var transposedBlock []byte
+			for i := 0; i < len(blocks); i++ {
+				transposedBlock = append(transposedBlock, blocks[i][k])
+			}
+			d := decrypt(transposedBlock, charFreq)
+			keyScore += d.score
+			key[k] = d.key
+		}
+		if keyScore > bestKeyScore {
+			bestKeyScore = keyScore
+			bestKey = key
+		}
 	}
 
-	for k := 0; k < keyLen; k++ {
-		var transposedBlock []byte
-		for i := 0; i < len(blocks); i++ {
-			transposedBlock = append(transposedBlock, blocks[i][k])
-		}
-		// fmt.Printf("%q\n", transposedBlock)
-		d := decrypt(transposedBlock, charFreq)
-		fmt.Printf("%q\n", d.b)
-		key[k] = d.key
+	// Do the decryption
+	var decrypted = make([]byte, len(encrypted))
+	for i, b := range encrypted {
+		decrypted[i] = b ^ bestKey[i%len(bestKey)]
 	}
-	fmt.Printf("key: %q, decrypted: %s\n", key, decrypted)
+
+	fmt.Printf("key: %q, decrypted: %q\n", bestKey, decrypted)
 }
 
+// This doesn't work, so I brute forced around it instead.
 func estimateKeyLen(b []byte) int {
 	var (
 		likeliestKeyLen   int
