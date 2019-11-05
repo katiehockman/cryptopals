@@ -12,11 +12,11 @@ import (
 	"math/bits"
 	"os"
 	"sort"
-	"strings"
-	"unicode"
 )
 
 func main() {
+	charFrequency := charFreqInText()
+
 	fmt.Println("exercise 1: ")
 	ex1([]byte("49276d206b696c6c696e6720796f757220627261696e206c696b65206120706f69736f6e6f7573206d757368726f6f6d"))
 
@@ -24,10 +24,10 @@ func main() {
 	ex2(bytes.NewBufferString("1c0111001f010100061a024b53535009181c"), bytes.NewBufferString("686974207468652062756c6c277320657965"))
 
 	fmt.Println("exercise 3: ")
-	ex3([]byte("1b37373331363f78151b7f2b783431333d78397828372d363c78373e783a393b3736"))
+	ex3([]byte("1b37373331363f78151b7f2b783431333d78397828372d363c78373e783a393b3736"), charFrequency)
 
 	fmt.Println("exercise 4: ")
-	ex4()
+	ex4(charFrequency)
 
 	fmt.Println("exercise 5: ")
 	ex5([]byte("Burning 'em, if you ain't quick and nimble\nI go crazy when I hear a cymbal"))
@@ -35,7 +35,7 @@ func main() {
 	// fmt.Println(hammingDistance([]byte("this is a test"), []byte("wokka wokka!!!")))
 
 	fmt.Println("exercise 6: ")
-	ex6()
+	ex6(charFrequency)
 
 	fmt.Println("exercise 7: ")
 	ex7()
@@ -43,6 +43,26 @@ func main() {
 	fmt.Println("exercise 8: ")
 	ex8()
 
+}
+
+func charFreqInText() map[byte]int {
+	file, err := os.Open("book.txt")
+	if err != nil {
+		log.Fatal(err)
+	}
+	defer file.Close()
+	r := bufio.NewReader(file)
+	m := make(map[byte]int)
+	for {
+		b, _, err := r.ReadLine()
+		if err != nil {
+			break
+		}
+		for _, x := range b {
+			m[x]++
+		}
+	}
+	return m
 }
 
 // Convert hex to base64
@@ -59,10 +79,11 @@ func encodeBase64(s []byte) []byte {
 
 func decodeBase64(s []byte) []byte {
 	dst := make([]byte, base64.StdEncoding.DecodedLen(len(s)))
-	if _, err := base64.StdEncoding.Decode(dst, s); err != nil {
+	n, err := base64.StdEncoding.Decode(dst, s)
+	if err != nil {
 		log.Fatal(err)
 	}
-	return dst
+	return dst[:n]
 }
 
 func encodeHex(s []byte) []byte {
@@ -73,10 +94,11 @@ func encodeHex(s []byte) []byte {
 
 func decodeHex(s []byte) []byte {
 	dst := make([]byte, hex.DecodedLen(len(s)))
-	if _, err := hex.Decode(dst, s); err != nil {
+	n, err := hex.Decode(dst, s)
+	if err != nil {
 		log.Fatal(err)
 	}
-	return dst
+	return dst[:n]
 }
 
 // Fixed XOR
@@ -98,26 +120,26 @@ func xor(a, b []byte) []byte {
 }
 
 // Single-byte XOR cipher
-func ex3(e []byte) {
+func ex3(e []byte, charFreq map[byte]int) {
 	decoded := decodeHex(e)
-	decrypted := decrypt(decoded)
+	decrypted := decrypt(decoded, charFreq)
 	fmt.Printf("decrypted: %s, key: %x\n", decrypted.b, decrypted.key)
 }
 
 type decryptedBytes struct {
 	b     []byte
-	score int
+	score float64
 	key   byte
 }
 
-func decrypt(b []byte) decryptedBytes {
+func decrypt(b []byte, charFreq map[byte]int) decryptedBytes {
 	var best decryptedBytes
 	for i := 0; i < 256; i++ {
 		dec := make([]byte, len(b))
 		for j := 0; j < len(dec); j++ {
 			dec[j] = b[j] ^ byte(i)
 		}
-		s := frequencyAnalysisScore(dec)
+		s := frequencyAnalysisScore(dec, charFreq)
 		if s > best.score {
 			best = decryptedBytes{dec, s, byte(i)}
 		}
@@ -126,7 +148,7 @@ func decrypt(b []byte) decryptedBytes {
 }
 
 // Detect single-character XOR
-func ex4() {
+func ex4(charFreq map[byte]int) {
 	file, err := os.Open("ex4.txt")
 	if err != nil {
 		log.Fatal(err)
@@ -139,12 +161,12 @@ func ex4() {
 		if err != nil {
 			break
 		}
-		decrypted := decrypt(decodeHex(b))
+		decrypted := decrypt(decodeHex(b), charFreq)
 		if decrypted.score > best.score {
 			best = decrypted
 		}
 	}
-	fmt.Printf("decrypted: %s score: %d, key: %x\n", best.b, best.score, best.key)
+	fmt.Printf("decrypted: %s score: %v, key: %x\n", best.b, best.score, best.key)
 }
 
 type pair struct {
@@ -168,29 +190,12 @@ func sortMapByValue(m map[rune]float64) pairSlice {
 	return p
 }
 
-func frequencyAnalysisScore(str []byte) int {
+func frequencyAnalysisScore(str []byte, charFreq map[byte]int) float64 {
 	score := 0
-	for _, s := range strings.Split(string(str), " ") {
-		charFreq := make(map[rune]float64)
-		for _, b := range s {
-			u := unicode.ToUpper(rune(b))
-			if u >= 'A' && u <= 'Z' {
-				charFreq[u]++
-			}
-		}
-		sorted := sortMapByValue(charFreq)
-		max := 6
-		if len(charFreq) < 6 {
-			max = len(charFreq)
-		}
-		for i := 0; i < max; i++ {
-			switch sorted[i].Key {
-			case 'E', 'T', 'A', 'O', 'I', 'N':
-				score++
-			}
-		}
+	for _, b := range str {
+		score += charFreq[b]
 	}
-	return score
+	return float64(score) / float64(len(str))
 }
 
 // Repeating-key XOR
@@ -211,7 +216,7 @@ func encrypt(s []byte, key []byte) []byte {
 }
 
 // Break repeating-key XOR
-func ex6() {
+func ex6(charFreq map[byte]int) {
 	fileBytes, err := ioutil.ReadFile("ex6.txt")
 	if err != nil {
 		log.Fatal(err)
@@ -228,7 +233,7 @@ func ex6() {
 	i := 0
 	for {
 		if i > len(encrypted)-keyLen {
-			//  blocks = append(blocks, encrypted[i:len(encrypted)])
+			// blocks = append(blocks, encrypted[i:len(encrypted)])
 			break
 		}
 		blocks = append(blocks, encrypted[i:i+keyLen])
@@ -240,11 +245,12 @@ func ex6() {
 		for i := 0; i < len(blocks); i++ {
 			transposedBlock = append(transposedBlock, blocks[i][k])
 		}
-		d := decrypt(transposedBlock)
-		// fmt.Printf("%s", d.b)
+		// fmt.Printf("%q\n", transposedBlock)
+		d := decrypt(transposedBlock, charFreq)
+		fmt.Printf("%q\n", d.b)
 		key[k] = d.key
 	}
-	fmt.Printf("key: %s, decrypted: %s\n", key, decrypted)
+	fmt.Printf("key: %q, decrypted: %s\n", key, decrypted)
 }
 
 func estimateKeyLen(b []byte) int {
@@ -252,11 +258,11 @@ func estimateKeyLen(b []byte) int {
 		likeliestKeyLen   int
 		lowestHammingDist = math.MaxFloat64
 		maxKeyLen         = 40
-		n                 = 60 // how many keyLen blocks to calculate the hamming distance
+		n                 = 10 // how many keyLen blocks to calculate the hamming distance
 	)
 	for keyLen := 2; keyLen <= maxKeyLen; keyLen++ {
 		totalDist := 0
-		for i := 0; i < n*2; i = i + n {
+		for i := 0; i < n*2; i = i + 2 {
 			first := b[keyLen*i : keyLen*(i+1)]
 			second := b[keyLen*(i+1) : keyLen*(i+2)]
 			totalDist += hammingDistance(first, second)
@@ -283,6 +289,8 @@ func hammingDistance(a, b []byte) int {
 	return dist
 }
 
-func ex7() {}
+func ex7() {
+
+}
 
 func ex8() {}
