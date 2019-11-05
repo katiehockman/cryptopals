@@ -3,6 +3,7 @@ package main
 import (
 	"bufio"
 	"bytes"
+	"crypto/aes"
 	"encoding/base64"
 	"encoding/hex"
 	"fmt"
@@ -88,7 +89,10 @@ func decodeBase64(s []byte) []byte {
 
 func encodeHex(s []byte) []byte {
 	dst := make([]byte, hex.EncodedLen(len(s)))
-	hex.Encode(dst, s)
+	n := hex.Encode(dst, s)
+	if n != hex.EncodedLen(len(s)) {
+		log.Fatal("issue with hex encoding")
+	}
 	return dst
 }
 
@@ -299,7 +303,24 @@ func hammingDistance(a, b []byte) int {
 }
 
 func ex7() {
-
+	// 128 bytes
+	cipherKey := []byte("YELLOW SUBMARINE")
+	fileBytes, err := ioutil.ReadFile("ex7.txt")
+	if err != nil {
+		log.Fatal(err)
+	}
+	decoded := decodeBase64(fileBytes)
+	block, err := aes.NewCipher(cipherKey)
+	if err != nil {
+		log.Fatal(err)
+	}
+	var decrypted []byte
+	for i := 0; i < len(decoded); i = i + 16 {
+		dst := make([]byte, 16)
+		block.Decrypt(dst, decoded[i:i+16])
+		decrypted = append(decrypted, dst...)
+	}
+	fmt.Printf("%s\n", decrypted)
 }
 
 func ex8() {}
