@@ -240,12 +240,8 @@ func ex6() {
 		for i := 0; i < len(blocks); i++ {
 			transposedBlock = append(transposedBlock, blocks[i][k])
 		}
-		fmt.Printf("%s", transposedBlock)
 		d := decrypt(transposedBlock)
-		/*for i := 0; i < len(decrypted); i = i + keyLen {
-			decrypted[i] = d.b[i%keyLen]
-		}*/
-		//fmt.Printf("%s", d.b)
+		// fmt.Printf("%s", d.b)
 		key[k] = d.key
 	}
 	fmt.Printf("key: %s, decrypted: %s\n", key, decrypted)
