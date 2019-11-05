@@ -6,6 +6,7 @@ import (
 	"encoding/base64"
 	"encoding/hex"
 	"fmt"
+	"io/ioutil"
 	"log"
 	"math"
 	"math/bits"
@@ -30,10 +31,11 @@ func main() {
 
 	fmt.Println("exercise 5: ")
 	ex5([]byte("Burning 'em, if you ain't quick and nimble\nI go crazy when I hear a cymbal"))
+	// Below yields 37
+	// fmt.Println(hammingDistance([]byte("this is a test"), []byte("wokka wokka!!!")))
 
 	fmt.Println("exercise 6: ")
 	ex6()
-	hammingDistance([]byte("this is a test"), []byte("wokka wokka!!!"))
 
 	fmt.Println("exercise 7: ")
 	ex7()
@@ -45,14 +47,33 @@ func main() {
 
 // Convert hex to base64
 func ex1(s []byte) {
-	encoded := base64.StdEncoding.EncodeToString(decodeHex(s))
-	fmt.Println(encoded)
+	decoded := decodeHex(s)
+	fmt.Printf("%s\n", encodeBase64(decoded))
 }
 
-func decodeHex(b []byte) []byte {
-	dst := make([]byte, hex.DecodedLen(len(b)))
-	_, err := hex.Decode(dst, b)
-	if err != nil {
+func encodeBase64(s []byte) []byte {
+	dst := make([]byte, base64.StdEncoding.EncodedLen(len(s)))
+	base64.StdEncoding.Encode(dst, s)
+	return dst
+}
+
+func decodeBase64(s []byte) []byte {
+	dst := make([]byte, base64.StdEncoding.DecodedLen(len(s)))
+	if _, err := base64.StdEncoding.Decode(dst, s); err != nil {
+		log.Fatal(err)
+	}
+	return dst
+}
+
+func encodeHex(s []byte) []byte {
+	dst := make([]byte, hex.EncodedLen(len(s)))
+	hex.Encode(dst, s)
+	return dst
+}
+
+func decodeHex(s []byte) []byte {
+	dst := make([]byte, hex.DecodedLen(len(s)))
+	if _, err := hex.Decode(dst, s); err != nil {
 		log.Fatal(err)
 	}
 	return dst
@@ -78,7 +99,8 @@ func xor(a, b []byte) []byte {
 
 // Single-byte XOR cipher
 func ex3(e []byte) {
-	decrypted := decryptEncoded(e)
+	decoded := decodeHex(e)
+	decrypted := decrypt(decoded)
 	fmt.Printf("decrypted: %s, key: %x\n", decrypted.b, decrypted.key)
 }
 
@@ -88,13 +110,12 @@ type decryptedBytes struct {
 	key   byte
 }
 
-func decryptEncoded(e []byte) decryptedBytes {
-	decoded := decodeHex(e)
+func decrypt(b []byte) decryptedBytes {
 	var best decryptedBytes
 	for i := 0; i < 256; i++ {
-		dec := make([]byte, len(decoded))
+		dec := make([]byte, len(b))
 		for j := 0; j < len(dec); j++ {
-			dec[j] = decoded[j] ^ byte(i)
+			dec[j] = b[j] ^ byte(i)
 		}
 		s := frequencyAnalysisScore(dec)
 		if s > best.score {
@@ -106,28 +127,24 @@ func decryptEncoded(e []byte) decryptedBytes {
 
 // Detect single-character XOR
 func ex4() {
-	r := fileReader("ex4.txt")
+	file, err := os.Open("ex4.txt")
+	if err != nil {
+		log.Fatal(err)
+	}
+	defer file.Close()
+	r := bufio.NewReader(file)
 	var best decryptedBytes
 	for {
 		b, _, err := r.ReadLine()
 		if err != nil {
 			break
 		}
-		decrypted := decryptEncoded(b)
+		decrypted := decrypt(decodeHex(b))
 		if decrypted.score > best.score {
 			best = decrypted
 		}
 	}
-	fmt.Printf("decrypted: %s, score: %d, key: %x\n", best.b, best.score, best.key)
-}
-
-func fileReader(filename string) *bufio.Reader {
-	file, err := os.Open(filename)
-	if err != nil {
-		log.Fatal(err)
-	}
-	defer file.Close()
-	return bufio.NewReader(file)
+	fmt.Printf("decrypted: %s score: %d, key: %x\n", best.b, best.score, best.key)
 }
 
 type pair struct {
@@ -178,17 +195,85 @@ func frequencyAnalysisScore(str []byte) int {
 
 // Repeating-key XOR
 func ex5(s []byte) {
-	key := []byte("ICE")
+	fmt.Printf("encrypted: %s\n", encrypt(s, []byte("ICE")))
+}
+
+// encrypts a byte slice with the provided key and
+// returns the hex encoded result.
+func encrypt(s []byte, key []byte) []byte {
 	encrypted := make([]byte, len(s))
 	for i := 0; i < len(s); i++ {
 		encrypted[i] = s[i] ^ key[i%len(key)]
 	}
 	encoded := make([]byte, hex.EncodedLen(len(encrypted)))
 	hex.Encode(encoded, encrypted)
-	fmt.Printf("encrypted: %s\n", encoded)
+	return encoded
 }
 
-func ex6() {}
+// Break repeating-key XOR
+func ex6() {
+	fileBytes, err := ioutil.ReadFile("ex6.txt")
+	if err != nil {
+		log.Fatal(err)
+	}
+	encrypted := decodeBase64(fileBytes)
+	keyLen := estimateKeyLen(encrypted)
+
+	var (
+		key       = make([]byte, keyLen)
+		decrypted = make([]byte, len(encrypted))
+		blocks    [][]byte
+	)
+
+	i := 0
+	for {
+		if i > len(encrypted)-keyLen {
+			//  blocks = append(blocks, encrypted[i:len(encrypted)])
+			break
+		}
+		blocks = append(blocks, encrypted[i:i+keyLen])
+		i += keyLen
+	}
+
+	for k := 0; k < keyLen; k++ {
+		var transposedBlock []byte
+		for i := 0; i < len(blocks); i++ {
+			transposedBlock = append(transposedBlock, blocks[i][k])
+		}
+		fmt.Printf("%s", transposedBlock)
+		d := decrypt(transposedBlock)
+		/*for i := 0; i < len(decrypted); i = i + keyLen {
+			decrypted[i] = d.b[i%keyLen]
+		}*/
+		//fmt.Printf("%s", d.b)
+		key[k] = d.key
+	}
+	fmt.Printf("key: %s, decrypted: %s\n", key, decrypted)
+}
+
+func estimateKeyLen(b []byte) int {
+	var (
+		likeliestKeyLen   int
+		lowestHammingDist = math.MaxFloat64
+		maxKeyLen         = 40
+		n                 = 60 // how many keyLen blocks to calculate the hamming distance
+	)
+	for keyLen := 2; keyLen <= maxKeyLen; keyLen++ {
+		totalDist := 0
+		for i := 0; i < n*2; i = i + n {
+			first := b[keyLen*i : keyLen*(i+1)]
+			second := b[keyLen*(i+1) : keyLen*(i+2)]
+			totalDist += hammingDistance(first, second)
+		}
+		normalized := float64(totalDist) / float64(n) / float64(keyLen)
+		// fmt.Printf("distance for key %v: %v\n", keyLen, normalized)
+		if normalized < lowestHammingDist {
+			lowestHammingDist = normalized
+			likeliestKeyLen = keyLen
+		}
+	}
+	return likeliestKeyLen
+}
 
 func hammingDistance(a, b []byte) int {
 	if len(a) != len(b) {
@@ -202,35 +287,6 @@ func hammingDistance(a, b []byte) int {
 	return dist
 }
 
-func ex7() {
-	r := fileReader("ex6.txt")
-	keyLen := bestKeyLen(r)
-}
-
-func bestKeyLen(r *bufio.Reader) int {
-	var likeliestKeyLen int
-	lowestHammingDist := math.MaxInt8
-	maxKeyLen := 40
-	n := 2
-	bytes, err := r.Peek(maxKeyLen * n)
-	if err != nil {
-		log.Fatal(err)
-	}
-	for keyLen := 2; keyLen < maxKeyLen; keyLen++ {
-		totalDist := 0
-		for i := 0; i < n; i++ {
-			first := bytes[keyLen*i : keyLen*(i+1)]
-			second := bytes[keyLen*(i+1) : keyLen*(i+2)]
-			totalDist += hammingDistance(first, second)
-		}
-		av := totalDist / n
-		normalized := av / keyLen
-		if normalized < lowestHammingDist {
-			lowestHammingDist = normalized
-			likeliestKeyLen = keyLen
-		}
-	}
-	return likeliestKeyLen
-}
+func ex7() {}
 
 func ex8() {}
