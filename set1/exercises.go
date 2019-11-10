@@ -43,7 +43,6 @@ func main() {
 
 	fmt.Println("exercise 8: ")
 	ex8()
-
 }
 
 func charFreqInText() map[byte]int {
@@ -302,6 +301,7 @@ func hammingDistance(a, b []byte) int {
 	return dist
 }
 
+// AES in ECB mode
 func ex7() {
 	// 128 bytes
 	cipherKey := []byte("YELLOW SUBMARINE")
@@ -310,17 +310,36 @@ func ex7() {
 		log.Fatal(err)
 	}
 	decoded := decodeBase64(fileBytes)
-	block, err := aes.NewCipher(cipherKey)
+	fmt.Printf("%s\n", aesecbDecrypt(decoded, cipherKey))
+}
+
+func aesecbDecrypt(text, key []byte) []byte {
+	block, err := aes.NewCipher(key)
 	if err != nil {
 		log.Fatal(err)
 	}
 	var decrypted []byte
-	for i := 0; i < len(decoded); i = i + 16 {
-		dst := make([]byte, 16)
-		block.Decrypt(dst, decoded[i:i+16])
+	for i := 0; i < len(text); i = i + aes.BlockSize {
+		dst := make([]byte, aes.BlockSize)
+		block.Decrypt(dst, text[i:i+aes.BlockSize])
 		decrypted = append(decrypted, dst...)
 	}
-	fmt.Printf("%s\n", decrypted)
+	return decrypted
 }
 
+func aesecbEncrypt(text, key []byte) []byte {
+	block, err := aes.NewCipher(key)
+	if err != nil {
+		log.Fatal(err)
+	}
+	var encrypted []byte
+	for i := 0; i < len(text); i = i + aes.BlockSize {
+		dst := make([]byte, aes.BlockSize)
+		block.Encrypt(dst, text[i:i+aes.BlockSize])
+		encrypted = append(encrypted, dst...)
+	}
+	return encrypted
+}
+
+// Detect AES in ECB mode
 func ex8() {}
