@@ -342,4 +342,34 @@ func aesecbEncrypt(text, key []byte) []byte {
 }
 
 // Detect AES in ECB mode
-func ex8() {}
+func ex8() {
+	file, err := os.Open("ex8.txt")
+	if err != nil {
+		log.Fatal(err)
+	}
+	defer file.Close()
+	r := bufio.NewReader(file)
+	var bestText []byte
+	var best int
+	for {
+		b, _, err := r.ReadLine()
+		if err != nil {
+			break
+		}
+		m := make(map[[aes.BlockSize]byte]int)
+		tmpTotal := 0
+		for i := 0; i < len(b); i = i + 16 {
+			var tmp [16]byte
+			copy(tmp[:], b[i:i+aes.BlockSize])
+			m[tmp]++
+			if m[tmp] > 1 {
+				tmpTotal++
+			}
+		}
+		if tmpTotal > best {
+			best = tmpTotal
+			bestText = b
+		}
+	}
+	fmt.Printf("%s", bestText)
+}
