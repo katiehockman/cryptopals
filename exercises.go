@@ -15,36 +15,6 @@ import (
 	"sort"
 )
 
-func main() {
-	charFrequency := charFreqInText()
-
-	fmt.Println("exercise 1: ")
-	ex1([]byte("49276d206b696c6c696e6720796f757220627261696e206c696b65206120706f69736f6e6f7573206d757368726f6f6d"))
-
-	fmt.Println("exercise 2: ")
-	ex2(bytes.NewBufferString("1c0111001f010100061a024b53535009181c"), bytes.NewBufferString("686974207468652062756c6c277320657965"))
-
-	fmt.Println("exercise 3: ")
-	ex3([]byte("1b37373331363f78151b7f2b783431333d78397828372d363c78373e783a393b3736"), charFrequency)
-
-	fmt.Println("exercise 4: ")
-	ex4(charFrequency)
-
-	fmt.Println("exercise 5: ")
-	ex5([]byte("Burning 'em, if you ain't quick and nimble\nI go crazy when I hear a cymbal"))
-	// Below yields 37
-	// fmt.Println(hammingDistance([]byte("this is a test"), []byte("wokka wokka!!!")))
-
-	fmt.Println("exercise 6: ")
-	ex6(charFrequency)
-
-	fmt.Println("exercise 7: ")
-	ex7()
-
-	fmt.Println("exercise 8: ")
-	ex8()
-}
-
 func charFreqInText() map[byte]int {
 	file, err := os.Open("book.txt")
 	if err != nil {
@@ -372,4 +342,81 @@ func ex8() {
 		}
 	}
 	fmt.Printf("%s", bestText)
+}
+
+func ex9() {
+	padded := []byte("YELLOW SUBMARINE")
+	b := byte(20 - len(padded))
+	for i := len(padded); i < 20; i++ {
+		padded = append(padded, b)
+	}
+	fmt.Printf("%q\n", padded)
+}
+
+func ex10() {}
+
+func ex11() {}
+
+func ex12() {}
+
+func ex13() {}
+
+func ex14() {}
+
+func ex15() {}
+
+func ex16() {}
+
+func main() {
+	charFrequency := charFreqInText()
+
+	fmt.Println("exercise 1: ")
+	ex1([]byte("49276d206b696c6c696e6720796f757220627261696e206c696b65206120706f69736f6e6f7573206d757368726f6f6d"))
+
+	fmt.Println("exercise 2: ")
+	ex2(bytes.NewBufferString("1c0111001f010100061a024b53535009181c"), bytes.NewBufferString("686974207468652062756c6c277320657965"))
+
+	fmt.Println("exercise 3: ")
+	ex3([]byte("1b37373331363f78151b7f2b783431333d78397828372d363c78373e783a393b3736"), charFrequency)
+
+	fmt.Println("exercise 4: ")
+	ex4(charFrequency)
+
+	fmt.Println("exercise 5: ")
+	ex5([]byte("Burning 'em, if you ain't quick and nimble\nI go crazy when I hear a cymbal"))
+	// Below yields 37
+	// fmt.Println(hammingDistance([]byte("this is a test"), []byte("wokka wokka!!!")))
+
+	fmt.Println("exercise 6: ")
+	ex6(charFrequency)
+
+	fmt.Println("exercise 7: ")
+	ex7()
+
+	fmt.Println("exercise 8: ")
+	ex8()
+
+	fmt.Println("exercise 9: ")
+	ex9()
+
+	fmt.Println("exercise 10: ")
+	ex10()
+
+	fmt.Println("exercise 11: ")
+	ex11()
+
+	fmt.Println("exercise 12: ")
+	ex12()
+
+	fmt.Println("exercise 13: ")
+	ex13()
+
+	fmt.Println("exercise 14: ")
+	ex14()
+
+	fmt.Println("exercise 15: ")
+	ex15()
+
+	fmt.Println("exercise 16: ")
+	ex16()
 }
