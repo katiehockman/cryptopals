@@ -23,7 +23,7 @@ var (
 )
 
 func charFreqInText() map[byte]int {
-	file, err := os.Open("book.txt")
+	file, err := os.Open("testdata/book.txt")
 	if err != nil {
 		log.Fatal(err)
 	}
@@ -129,7 +129,7 @@ func decrypt(b []byte, charFreq map[byte]int) decryptedBytes {
 
 // Detect single-character XOR
 func ex4(charFreq map[byte]int) {
-	file, err := os.Open("ex4.txt")
+	file, err := os.Open("testdata/ex4.txt")
 	if err != nil {
 		log.Fatal(err)
 	}
@@ -197,7 +197,7 @@ func encrypt(s []byte, key []byte) []byte {
 
 // Break repeating-key XOR
 func ex6(charFreq map[byte]int) {
-	fileBytes, err := ioutil.ReadFile("ex6.txt")
+	fileBytes, err := ioutil.ReadFile("testdata/ex6.txt")
 	if err != nil {
 		log.Fatal(err)
 	}
@@ -282,7 +282,7 @@ func hammingDistance(a, b []byte) int {
 func ex7() {
 	// 128 bytes
 	cipherKey := []byte("YELLOW SUBMARINE")
-	fileBytes, err := ioutil.ReadFile("ex7.txt")
+	fileBytes, err := ioutil.ReadFile("testdata/ex7.txt")
 	if err != nil {
 		log.Fatal(err)
 	}
@@ -306,7 +306,7 @@ func aesecbDecrypt(text, key []byte) []byte {
 
 // Detect AES in ECB mode
 func ex8() {
-	file, err := os.Open("ex8.txt")
+	file, err := os.Open("testdata/ex8.txt")
 	if err != nil {
 		log.Fatal(err)
 	}
@@ -353,7 +353,7 @@ func pkcs7Pad(b []byte, size int) []byte {
 
 func ex10() {
 	key := []byte("YELLOW SUBMARINE")
-	encoded, err := ioutil.ReadFile("ex10.txt")
+	encoded, err := ioutil.ReadFile("testdata/ex10.txt")
 	if err != nil {
 		log.Fatal(err)
 	}
