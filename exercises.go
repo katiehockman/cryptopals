@@ -352,15 +352,20 @@ func ex8() {
 }
 
 func ex9() {
-	padded := []byte("YELLOW SUBMARINE")
-	b := byte(20 - len(padded))
-	for i := len(padded); i < 20; i++ {
-		padded = append(padded, b)
-	}
-	fmt.Printf("%q\n", padded)
+	x := []byte("YELLOW SUBMARINE")
+	size := 30
+	fmt.Printf("%q\n", pkcs7Pad(x, size))
 }
 
-func ex10UsingStdLibrary() {
+func pkcs7Pad(b []byte, size int) []byte {
+	padding := size - len(b)
+	for i := 0; i < padding; i++ {
+		b = append(b, byte(padding))
+	}
+	return b
+}
+
+func ex10() {
 	encoded, err := ioutil.ReadFile("ex10.txt")
 	if err != nil {
 		log.Fatal(err)
@@ -377,13 +382,11 @@ func ex10UsingStdLibrary() {
 	for i := 0; i < aes.BlockSize; i++ {
 		iv[i] = byte(0)
 	}
+
+	// Using the standard library
 	mode := cipher.NewCBCDecrypter(block, iv)
 	mode.CryptBlocks(cipherText, cipherText)
 	fmt.Printf("%s\n", cipherText)
-}
-
-func ex10() {
-
 }
 
 func ex11() {}
@@ -427,7 +430,6 @@ func main() {
 		fmt.Println("exercise 9: ")
 		ex9()
 		fmt.Println("exercise 10: ")
-		ex10UsingStdLibrary()
 		ex10()
 		fmt.Println("exercise 11: ")
 		ex11()
