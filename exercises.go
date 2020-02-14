@@ -304,20 +304,6 @@ func aesecbDecrypt(text, key []byte) []byte {
 	return decrypted
 }
 
-func aesecbEncrypt(text, key []byte) []byte {
-	block, err := aes.NewCipher(key)
-	if err != nil {
-		log.Fatal(err)
-	}
-	var encrypted []byte
-	for i := 0; i < len(text); i = i + aes.BlockSize {
-		dst := make([]byte, aes.BlockSize)
-		block.Encrypt(dst, text[i:i+aes.BlockSize])
-		encrypted = append(encrypted, dst...)
-	}
-	return encrypted
-}
-
 // Detect AES in ECB mode
 func ex8() {
 	file, err := os.Open("ex8.txt")
@@ -366,6 +352,7 @@ func pkcs7Pad(b []byte, size int) []byte {
 }
 
 func ex10() {
+	key := []byte("YELLOW SUBMARINE")
 	encoded, err := ioutil.ReadFile("ex10.txt")
 	if err != nil {
 		log.Fatal(err)
@@ -374,19 +361,37 @@ func ex10() {
 	if len(cipherText)%aes.BlockSize != 0 {
 		log.Fatal("cipherText is not a multiple of the block size")
 	}
-	block, err := aes.NewCipher([]byte("YELLOW SUBMARINE"))
-	if err != nil {
-		log.Fatal(err)
-	}
 	iv := make([]byte, aes.BlockSize)
 	for i := 0; i < aes.BlockSize; i++ {
 		iv[i] = byte(0)
 	}
+	block, err := aes.NewCipher(key)
+	if err != nil {
+		log.Fatal(err)
+	}
 
+	//fmt.Printf("%s\n", cbcDecryptStdLib(block, cipherText, iv))
+	fmt.Printf("%s\n", cbcDecrypt(block, cipherText, iv))
+}
+
+func cbcDecrypt(block cipher.Block, cipherText, iv []byte) []byte {
+	var decrypted []byte
+	prev := iv // The first plaintext block is XOR'd with the IV.
+	for i := 0; i < len(cipherText); i = i + aes.BlockSize {
+		cur := cipherText[i : i+aes.BlockSize]
+		dst := make([]byte, aes.BlockSize)
+		block.Decrypt(dst, cur)
+		decrypted = append(decrypted, xor(prev, dst)...)
+		prev = cur
+	}
+	return decrypted
+}
+
+func cbcDecryptStdLib(block cipher.Block, cipherText, iv []byte) []byte {
 	// Using the standard library
 	mode := cipher.NewCBCDecrypter(block, iv)
 	mode.CryptBlocks(cipherText, cipherText)
-	fmt.Printf("%s\n", cipherText)
+	return cipherText
 }
 
 func ex11() {}
