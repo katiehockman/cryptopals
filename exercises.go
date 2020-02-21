@@ -205,12 +205,14 @@ func ex6(charFreq map[byte]int) {
 	smallest := math.MaxFloat64
 	smallestKeyLen := 0
 	for i := 2; i < 40; i++ {
-		// Step 3 - take 20 keysize blocks and calculate normalized edit distance
+		// Step 3 - take 30 keysize blocks and calculate normalized edit distance
 		dist := 0
-		for n := 0; n < 10; n++ {
-			a := encrypted[n*i : n*i+i]
-			b := encrypted[n*i+i : n*i+2*i]
+		cur := 0
+		for n := 0; n < 15; n++ {
+			a := encrypted[cur : cur+i]
+			b := encrypted[cur+i : cur+i*2]
 			dist += hammingDistance(a, b)
+			cur += i * 2
 		}
 		normalized := float64(dist / i)
 		if normalized < smallest {
