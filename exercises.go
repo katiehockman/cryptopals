@@ -12,7 +12,6 @@ import (
 	"io/ioutil"
 	"log"
 	"math"
-	"math/bits"
 	"os"
 	"sort"
 )
@@ -202,78 +201,73 @@ func ex6(charFreq map[byte]int) {
 		log.Fatal(err)
 	}
 	encrypted := decodeBase64(fileBytes)
-	var bestKey []byte
-	var bestKeyScore float64
-	for keyLen := 2; keyLen < 35; keyLen++ {
-		key := make([]byte, keyLen)
-		keyScore := 0.0
-		var blocks [][]byte
-		i := 0
-		for {
-			if i > len(encrypted)-keyLen {
-				break
-			}
-			blocks = append(blocks, encrypted[i:i+keyLen])
-			i += keyLen
+	// Step 1 - find the key length by trying some values
+	smallest := math.MaxFloat64
+	smallestKeyLen := 0
+	for i := 2; i < 40; i++ {
+		// Step 3 - take 20 keysize blocks and calculate normalized edit distance
+		dist := 0
+		for n := 0; n < 10; n++ {
+			a := encrypted[n*i : n*i+i]
+			b := encrypted[n*i+i : n*i+2*i]
+			dist += hammingDistance(a, b)
 		}
+		normalized := float64(dist / i)
+		if normalized < smallest {
+			smallest = normalized
+			smallestKeyLen = i
+		}
+	}
 
-		for k := 0; k < keyLen; k++ {
-			var transposedBlock []byte
-			for i := 0; i < len(blocks); i++ {
-				transposedBlock = append(transposedBlock, blocks[i][k])
-			}
-			d := decrypt(transposedBlock, charFreq)
-			keyScore += d.score
-			key[k] = d.key
+	// Step 4 - whichever keyLen has the lowest edit distance is probably the key
+	keyLen := smallestKeyLen
+
+	// Step 5 - break into keyLen blocks
+	var blocks [][]byte
+	i := 0
+	for {
+		if i > len(encrypted)-keyLen {
+			break
 		}
-		if keyScore > bestKeyScore {
-			bestKeyScore = keyScore
-			bestKey = key
+		blocks = append(blocks, encrypted[i:i+keyLen])
+		i += keyLen
+	}
+
+	// Step 6 - transpose blocks
+	key := make([]byte, keyLen)
+	keyScore := 0.0
+	for k := 0; k < keyLen; k++ {
+		var transposedBlock []byte
+		for i := 0; i < len(blocks); i++ {
+			transposedBlock = append(transposedBlock, blocks[i][k])
 		}
+		// Step 7 - solve for one key character
+		d := decrypt(transposedBlock, charFreq)
+		// Step 8 - add the single byte XOR key to the final key
+		keyScore += d.score
+		key[k] = d.key
 	}
 
 	// Do the decryption
 	var decrypted = make([]byte, len(encrypted))
 	for i, b := range encrypted {
-		decrypted[i] = b ^ bestKey[i%len(bestKey)]
+		decrypted[i] = b ^ key[i%len(key)]
 	}
 
-	fmt.Printf("key: %q, decrypted: %q\n", bestKey, decrypted)
+	fmt.Printf("key: %q, decrypted: %s\n", key, decrypted)
 }
 
-// This doesn't work, so I brute forced around it instead.
-func estimateKeyLen(b []byte) int {
-	var (
-		likeliestKeyLen   int
-		lowestHammingDist = math.MaxFloat64
-		maxKeyLen         = 40
-		n                 = 10 // how many keyLen blocks to calculate the hamming distance
-	)
-	for keyLen := 2; keyLen <= maxKeyLen; keyLen++ {
-		totalDist := 0
-		for i := 0; i < n*2; i = i + 2 {
-			first := b[keyLen*i : keyLen*(i+1)]
-			second := b[keyLen*(i+1) : keyLen*(i+2)]
-			totalDist += hammingDistance(first, second)
-		}
-		normalized := float64(totalDist) / float64(n) / float64(keyLen)
-		// fmt.Printf("distance for key %v: %v\n", keyLen, normalized)
-		if normalized < lowestHammingDist {
-			lowestHammingDist = normalized
-			likeliestKeyLen = keyLen
-		}
-	}
-	return likeliestKeyLen
-}
-
-func hammingDistance(a, b []byte) int {
+func hammingDistance(a, b []byte) int { // Step 2 of Set 1 Exercise 6
 	if len(a) != len(b) {
 		log.Fatal("byte slices must be of equal length to calculate Hamming distance")
 	}
 	var dist int
 	for _, x := range xor(a, b) {
-		// Maybe do this the hard way for learning, but *shrug*
-		dist += bits.OnesCount8(x)
+		for i := 0; i < 8; i++ {
+			if x&(1<<i) > 0 {
+				dist++
+			}
+		}
 	}
 	return dist
 }
@@ -426,7 +420,7 @@ func main() {
 		fmt.Println("exercise 6: ")
 		ex6(charFrequency)
 		fmt.Println("exercise 7: ")
-		ex7()
+		//ex7()
 		fmt.Println("exercise 8: ")
 		ex8()
 	}
