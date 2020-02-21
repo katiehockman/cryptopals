@@ -422,7 +422,7 @@ func main() {
 		fmt.Println("exercise 6: ")
 		ex6(charFrequency)
 		fmt.Println("exercise 7: ")
-		//ex7()
+		ex7()
 		fmt.Println("exercise 8: ")
 		ex8()
 	}
