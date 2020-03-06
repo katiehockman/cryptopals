@@ -5,6 +5,7 @@ import (
 	"bytes"
 	"crypto/aes"
 	"crypto/cipher"
+	"crypto/rand"
 	"encoding/base64"
 	"encoding/hex"
 	"flag"
@@ -12,6 +13,7 @@ import (
 	"io/ioutil"
 	"log"
 	"math"
+	"math/big"
 	"os"
 	"sort"
 )
@@ -179,12 +181,12 @@ func frequencyAnalysisScore(str []byte, charFreq map[byte]int) float64 {
 
 // Repeating-key XOR
 func ex5(s []byte) {
-	fmt.Printf("encrypted: %s\n", encrypt(s, []byte("ICE")))
+	fmt.Printf("encrypted: %s\n", xorEncrypt(s, []byte("ICE")))
 }
 
 // encrypts a byte slice with the provided key and
 // returns the hex encoded result.
-func encrypt(s []byte, key []byte) []byte {
+func xorEncrypt(s []byte, key []byte) []byte {
 	encrypted := make([]byte, len(s))
 	for i := 0; i < len(s); i++ {
 		encrypted[i] = s[i] ^ key[i%len(key)]
@@ -280,15 +282,15 @@ func ex7() {
 	if err != nil {
 		log.Fatal(err)
 	}
-	decoded := decodeBase64(fileBytes)
-	fmt.Printf("%s\n", aesecbDecrypt(decoded, cipherKey))
-}
-
-func aesecbDecrypt(text, key []byte) []byte {
-	block, err := aes.NewCipher(key)
+	block, err := aes.NewCipher(cipherKey)
 	if err != nil {
 		log.Fatal(err)
 	}
+	decoded := decodeBase64(fileBytes)
+	fmt.Printf("%s\n", ecbDecrypt(block, decoded, cipherKey))
+}
+
+func ecbDecrypt(block cipher.Block, text, key []byte) []byte {
 	var decrypted []byte
 	for i := 0; i < len(text); i = i + aes.BlockSize {
 		dst := make([]byte, aes.BlockSize)
@@ -296,6 +298,16 @@ func aesecbDecrypt(text, key []byte) []byte {
 		decrypted = append(decrypted, dst...)
 	}
 	return decrypted
+}
+
+func ecbEncrypt(block cipher.Block, text []byte) []byte {
+	var encrypted []byte
+	for i := 0; i < len(text); i = i + aes.BlockSize {
+		dst := make([]byte, aes.BlockSize)
+		block.Encrypt(dst, text[i:i+aes.BlockSize])
+		encrypted = append(encrypted, dst...)
+	}
+	return encrypted
 }
 
 // Detect AES in ECB mode
@@ -338,11 +350,14 @@ func ex9() {
 }
 
 func pkcs7Pad(b []byte, size int) []byte {
-	padding := size - len(b)
-	for i := 0; i < padding; i++ {
-		b = append(b, byte(padding))
+	if len(b) > size {
+		panic(fmt.Sprintf("cannot pad %d bytes to a length of %d", len(b), size))
 	}
-	return b
+	padding := make([]byte, size-len(b))
+	for i := 0; i < len(padding); i++ {
+		padding[i] = byte(len(padding))
+	}
+	return append(b, padding...)
 }
 
 func ex10() {
@@ -355,17 +370,23 @@ func ex10() {
 	if len(cipherText)%aes.BlockSize != 0 {
 		log.Fatal("cipherText is not a multiple of the block size")
 	}
-	iv := make([]byte, aes.BlockSize)
-	for i := 0; i < aes.BlockSize; i++ {
-		iv[i] = byte(0)
-	}
+	iv := ivWithLen(aes.BlockSize)
 	block, err := aes.NewCipher(key)
 	if err != nil {
 		log.Fatal(err)
 	}
 
 	//fmt.Printf("%s\n", cbcDecryptStdLib(block, cipherText, iv))
-	fmt.Printf("%s\n", cbcDecrypt(block, cipherText, iv))
+	d := cbcDecrypt(block, cipherText, iv)
+	fmt.Printf("%s\n", d)
+}
+
+func ivWithLen(len int) []byte {
+	iv := make([]byte, len)
+	for i := 0; i < len; i++ {
+		iv[i] = byte(0)
+	}
+	return iv
 }
 
 func cbcDecrypt(block cipher.Block, cipherText, iv []byte) []byte {
@@ -388,7 +409,73 @@ func cbcDecryptStdLib(block cipher.Block, cipherText, iv []byte) []byte {
 	return cipherText
 }
 
-func ex11() {}
+func randomEncrypt(text []byte) []byte {
+	key := aesKey()
+	block, err := aes.NewCipher(key)
+	if err != nil {
+		log.Fatal(err)
+	}
+	iv := ivWithLen(aes.BlockSize)
+
+	// append some bytes to the beginning and the end of the text
+	makeRandomBytes := func() []byte {
+		num, err := rand.Int(rand.Reader, big.NewInt(6))
+		if err != nil {
+			panic(err)
+		}
+		randBytes := make([]byte, 5+int(num.Int64()))
+		if _, err := rand.Read(randBytes); err != nil {
+			panic(err)
+		}
+		return randBytes
+	}
+	text = append(makeRandomBytes(), text...) // at the beginning
+	text = append(text, makeRandomBytes()...) // at the end
+
+	// Randomly decide to encrypt using CBC or ECB half the time each.
+	encryptCbc, err := rand.Int(rand.Reader, big.NewInt(2))
+	if err != nil {
+		panic(err)
+	}
+	if encryptCbc.Int64() == 0 {
+		fmt.Println("Used CBC!")
+		return cbcEncrypt(block, text, iv)
+	}
+	fmt.Println("Used ECB!")
+	return ecbEncrypt(block, text)
+}
+
+func cbcEncrypt(block cipher.Block, text, iv []byte) []byte {
+	var encrypted []byte
+	prev := iv // The first plaintext block is XOR'd with the IV.
+	for i := 0; i < len(text); i = i + aes.BlockSize {
+		cur := text[i : i+aes.BlockSize]
+		x := xor(cur, prev)
+		e := make([]byte, aes.BlockSize)
+		block.Encrypt(e, x)
+		encrypted = append(encrypted, e...)
+		prev = e
+	}
+	return encrypted
+}
+
+func ex11() {
+	plaintext, err := ioutil.ReadFile("testdata/ex11.txt")
+	if err != nil {
+		log.Fatal(err)
+	}
+	encrypted := randomEncrypt(plaintext)
+	fmt.Printf("%x\n", encrypted)
+}
+
+func aesKey() []byte {
+	b := make([]byte, aes.BlockSize)
+	_, err := rand.Read(b)
+	if err != nil {
+		log.Fatal(err)
+	}
+	return b
+}
 
 func ex12() {}
 
