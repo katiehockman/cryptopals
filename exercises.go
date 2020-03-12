@@ -459,13 +459,26 @@ func cbcEncrypt(block cipher.Block, text, iv []byte) []byte {
 	return encrypted
 }
 
-func ex11() {
+func detectEncryption(f func(plaintext []byte) []byte) string {
 	plaintext, err := ioutil.ReadFile("testdata/ex11.txt")
 	if err != nil {
 		log.Fatal(err)
 	}
-	encrypted := randomEncrypt(plaintext)
-	fmt.Printf("%x\n", encrypted)
+	encrypted := f(plaintext)
+	blocks := make(map[string]bool)
+	for i := 0; i < len(encrypted); i = i + aes.BlockSize {
+		block := string(encrypted[i : i+aes.BlockSize])
+		if blocks[block] {
+			return "ECB"
+		}
+		blocks[block] = true
+	}
+	return "CBC"
+}
+
+func ex11() {
+	detected := detectEncryption(randomEncrypt)
+	fmt.Printf("Detected algorithm: %s\n", detected)
 }
 
 func aesKey() []byte {
