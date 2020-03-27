@@ -500,11 +500,7 @@ func ecbEncryptOracle(text []byte) []byte {
 }
 
 func ex12() {
-	plaintext, err := ioutil.ReadFile("testdata/ex11.txt")
-	if err != nil {
-		log.Fatal(err)
-	}
-	_ = ecbEncryptOracle(plaintext)
+	// Detect the block size
 	a := "A"
 	cur := len(ecbEncryptOracle([]byte(a)))
 	var blockSize int
@@ -523,14 +519,16 @@ s:
 			}
 		}
 	}
+	// Detect the encryption algorithm (ie. ECB or CBC)
 	if detectEncryption(ecbEncryptOracle) != "ECB" {
 		panic("we know it's using ECB")
 	}
-	var short []byte
 	// Knowing the block size, craft an input block that is exactly 1 byte short
+	var short []byte
 	for i := 0; i < blockSize-1; i++ {
 		short = append(short, byte('A'))
 	}
+	// Decode the text byte-by-byte
 	var decoded []byte
 	for i := 0; i < blockSize-1; i++ {
 		block := string(ecbEncryptOracle(short))[:blockSize]
@@ -540,15 +538,15 @@ s:
 			toCheck = append(toCheck, char)
 			maybe := string(ecbEncryptOracle(toCheck)[:blockSize])
 			if maybe == block {
-				fmt.Printf("%s", string(char))
+				// fmt.Printf("%s", string(char))
 				decoded = append(decoded, char)
 				break
 			}
 		}
 		short = short[1:]
 	}
-	fmt.Printf("\n%s\n", string(decoded))
-	// Currently only decodes the first block. Need to decode other blocks.
+	fmt.Printf("%s\n", string(decoded))
+	// TODO: Currently only decodes the first block. Need to decode other blocks.
 }
 
 func ex13() {}
