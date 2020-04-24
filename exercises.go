@@ -14,8 +14,11 @@ import (
 	"log"
 	"math"
 	"math/big"
+	"net/url"
 	"os"
 	"sort"
+	"strconv"
+	"strings"
 )
 
 var (
@@ -287,10 +290,10 @@ func ex7() {
 		log.Fatal(err)
 	}
 	decoded := decodeBase64(fileBytes)
-	fmt.Printf("%s\n", ecbDecrypt(block, decoded, cipherKey))
+	fmt.Printf("%s\n", ecbDecrypt(block, decoded))
 }
 
-func ecbDecrypt(block cipher.Block, text, key []byte) []byte {
+func ecbDecrypt(block cipher.Block, text []byte) []byte {
 	var decrypted []byte
 	for i := 0; i < len(text); i = i + aes.BlockSize {
 		dst := make([]byte, aes.BlockSize)
@@ -499,12 +502,10 @@ func ecbEncryptOracle(text []byte) []byte {
 	return ecbEncrypt(block, text)
 }
 
-func ex12() {
-	// Detect the block size
+func detectBlockSize(oracle func(text []byte) []byte) int {
 	a := "A"
-	cur := len(ecbEncryptOracle([]byte(a)))
+	cur := len(oracle([]byte(a)))
 	var blockSize int
-s:
 	for {
 		a += "A"
 		if got := len(ecbEncryptOracle([]byte(a))); got != cur {
@@ -513,12 +514,18 @@ s:
 			for {
 				a += "A"
 				if len(ecbEncryptOracle([]byte(a))) != cur {
-					break s
+					return blockSize
 				}
 				blockSize++
 			}
 		}
 	}
+}
+
+func ex12() {
+	// Detect the block size
+	blockSize := detectBlockSize(ecbEncryptOracle)
+
 	// Detect the encryption algorithm (ie. ECB or CBC)
 	if detectEncryption(ecbEncryptOracle) != "ECB" {
 		panic("we know it's using ECB")
@@ -556,7 +563,64 @@ outer:
 	fmt.Printf("%s\n", result)
 }
 
-func ex13() {}
+func ex13() {
+	var (
+		// an email that will allow us to create a role=admin user
+		email = "foooooooooadmin\x04\x04\x04\x04\x04\x04\x04\x04\x04\x04\x04ooooooooooo@bar.com"
+	)
+	// Setup: Create the key and encryption algo
+	key := aesKey()
+	block, err := aes.NewCipher(key)
+	if err != nil {
+		log.Fatal(err)
+	}
+	// Create profile from email
+	profile, err := profileFor(email)
+	if err != nil {
+		log.Fatal(err)
+	}
+	fmt.Printf("before: %v\n", decodeProfile(profile))
+	// Encrypt it, then give the ciphertext to the attacker
+	e := ecbEncrypt(block, []byte(profile))
+
+	// Substitute the last block of the encrypted text with our crafted admin block
+	bs := aes.BlockSize
+	e = e[:len(e)-bs]
+	e = append(e, e[bs:bs*2]...) // admin is in the second block
+
+	d := ecbDecrypt(block, e)
+	fmt.Printf("after:  %v\n", decodeProfile(string(d)))
+}
+
+func profileFor(email string) (string, error) {
+	if strings.ContainsAny(email, "&=") {
+		return "", fmt.Errorf("email contains forbidden characters: %v", email)
+	}
+	p := &profile{email: email, uid: 10, role: "user"}
+	return p.Encode(), nil
+}
+
+type profile struct {
+	email string
+	uid   int
+	role  string
+}
+
+func (p *profile) Encode() string {
+	return fmt.Sprintf("email=%s&uid=%d&role=%s", p.email, p.uid, p.role)
+}
+
+func decodeProfile(s string) profile {
+	m, err := url.ParseQuery(s)
+	if err != nil {
+		panic(err)
+	}
+	uid, err := strconv.Atoi(m.Get("uid"))
+	if err != nil {
+		panic(err)
+	}
+	return profile{email: m.Get("email"), uid: uid, role: m.Get("role")}
+}
 
 func ex14() {}
 
