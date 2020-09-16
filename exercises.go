@@ -492,6 +492,7 @@ func ex11() {
 var fixedKey = []byte("YELLOW SUBMARINE")
 var unknownBytes = []byte("Um9sbGluJyBpbiBteSA1LjAKV2l0aCBteSByYWctdG9wIGRvd24gc28gbXkgaGFpciBjYW4gYmxvdwpUaGUgZ2lybGllcyBvbiBzdGFuZGJ5IHdhdmluZyBqdXN0IHRvIHNheSBoaQpEaWQgeW91IHN0b3A/IE5vLCBJIGp1c3QgZHJvdmUgYnkK")
 
+// AES-128-ECB(attacker-controlled || target-bytes, random-key)
 func ecbEncryptOracle(text []byte) []byte {
 	block, err := aes.NewCipher(fixedKey)
 	if err != nil {
@@ -502,63 +503,65 @@ func ecbEncryptOracle(text []byte) []byte {
 	return ecbEncrypt(block, text)
 }
 
-func detectBlockSize(oracle func(text []byte) []byte) int {
-	a := "A"
-	cur := len(oracle([]byte(a)))
-	var blockSize int
-	for {
-		a += "A"
-		if got := len(ecbEncryptOracle([]byte(a))); got != cur {
-			cur = got
-			blockSize = 1
-			for {
-				a += "A"
-				if len(ecbEncryptOracle([]byte(a))) != cur {
-					return blockSize
+func ex12() {
+	// Detect the block size
+	detectBlockSize := func(oracle func(text []byte) []byte) int {
+		a := "A"
+		cur := len(oracle([]byte(a)))
+		var blockSize int
+		for {
+			a += "A"
+			if got := len(oracle([]byte(a))); got != cur {
+				cur = got
+				blockSize = 1
+				for {
+					a += "A"
+					if len(oracle([]byte(a))) != cur {
+						return blockSize
+					}
+					blockSize++
 				}
-				blockSize++
 			}
 		}
 	}
-}
-
-func ex12() {
-	// Detect the block size
 	blockSize := detectBlockSize(ecbEncryptOracle)
 
 	// Detect the encryption algorithm (ie. ECB or CBC)
 	if detectEncryption(ecbEncryptOracle) != "ECB" {
 		panic("we know it's using ECB")
 	}
+
 	var result string
 	decodedLen := base64.StdEncoding.DecodedLen(len(unknownBytes))
 outer:
-	for x := 0; ; x = x + blockSize {
+	for x := 1; ; x++ {
 		// Knowing the block size, craft an input block that is exactly 1 byte short
 		var short string
 		for i := 0; i < blockSize; i++ {
 			short += "A"
 		}
 		// Decode the text byte-by-byte
-		var cur string
 		for i := 0; i < blockSize; i++ {
-			if len(result)+len(cur) == decodedLen {
-				result += cur
+			if len(result) == decodedLen {
 				break outer
 			}
 			short = short[1:] // chop off the first byte
-			block := string(ecbEncryptOracle([]byte(short)))[:x+blockSize]
+			block := string(ecbEncryptOracle([]byte(short)))[:x*blockSize]
 			for b := 0; b < 256; b++ { // loop over all UTF-8 characters
-				char := string(b)
-				toCheck := short + result + cur + char
-				maybe := string(ecbEncryptOracle([]byte(toCheck))[:x+blockSize])
+				toTry := string(b)
+				// We need to feed into the oracle:
+				//   - the identical bytes as padding (ie. AAAAAAA)
+				//   - the decrypted text so far
+				//   - the current character we are attempting
+				toCheck := short + result + toTry
+				maybe := string(ecbEncryptOracle([]byte(toCheck))[:x*blockSize])
 				if maybe == block {
-					cur += char
+					// This is the correct character, so add it to the result
+					result += toTry
 					break
 				}
 			}
 		}
-		result += cur
 	}
 	fmt.Printf("%s\n", result)
 }
@@ -568,7 +571,7 @@ func ex13() {
 		// an email that will allow us to create a role=admin user
 		email = "foooooooooadmin\x04\x04\x04\x04\x04\x04\x04\x04\x04\x04\x04ooooooooooo@bar.com"
 	)
-	// Setup: Create the key and encryption algo
+	// Setup: Create the key
 	key := aesKey()
 	block, err := aes.NewCipher(key)
 	if err != nil {
@@ -622,7 +625,125 @@ func decodeProfile(s string) profile {
 	return profile{email: m.Get("email"), uid: uid, role: m.Get("role")}
 }
 
-func ex14() {}
+/*
+	detectBlockSize := func(oracle func(text, randPrefix []byte) []byte) int {
+		ct := oracle([]byte(""), randPrefix)
+		minDelta := math.MaxInt8
+		for i := 0; i < 20; i++ {
+			newCt := oracle([]byte(""), randPrefix)
+			delta := int(math.Abs(float64(len(newCt) - len(ct))))
+			if delta < minDelta && delta != 0 {
+				minDelta = delta
+			}
+			ct = newCt
+		}
+		return minDelta
+	}
+	blockSize := detectBlockSize(ecbEncryptOracle2)
+*/
+
+func ex14() {
+	// Generate a random count of random bytes and prepend
+	num, err := rand.Int(rand.Reader, big.NewInt(20))
+	if err != nil {
+		panic(err)
+	}
+	randPrefix := make([]byte, int(num.Int64()))
+	if _, err := rand.Read(randPrefix); err != nil {
+		panic(err)
+	}
+	detectBlockSize := func(oracle func(text, randPrefix []byte) []byte) int {
+		a := ""
+		cur := len(oracle([]byte(a), randPrefix))
+		var blockSize int
+		for {
+			a += "A"
+			if got := len(oracle([]byte(a), randPrefix)); got != cur {
+				cur = got
+				blockSize = 1
+				for {
+					a += "A"
+					if len(oracle([]byte(a), randPrefix)) != cur {
+						return blockSize
+					}
+					blockSize++
+				}
+			}
+		}
+	}
+	blockSize := detectBlockSize(ecbEncryptOracle2)
+	// Detect the encryption algorithm (ie. ECB or CBC)
+	if detectEncryption2(ecbEncryptOracle2, randPrefix) != "ECB" {
+		panic("we know it's using ECB")
+	}
+
+	// TODO: Do this the right way. I'm cheating a bit here by figuring out
+	// the padding by using the length of the random prefix (which is probably
+	// meant to be unknown). Some day, calculate the prefix length.
+
+	mod := (16 - len(randPrefix)) % 16
+	padding := "0"
+	for i := 0; i < mod; i++ {
+		padding += "0"
+	}
+	padding = padding[1:]
+	toIgnore := len(padding) + len(randPrefix)
+
+	var result string
+	decodedLen := base64.StdEncoding.DecodedLen(len(unknownBytes))
+outer:
+	for x := 0; ; x = x + blockSize {
+		// Knowing the block size, craft an input block that is exactly 1 byte short
+		var short string
+		for i := 0; i < blockSize; i++ {
+			short += "A"
+		}
+		// Decode the text byte-by-byte
+		for i := 0; i < blockSize; i++ {
+			if len(result) == decodedLen {
+				break outer
+			}
+			short = short[1:] // chop off the first byte
+			block := string(ecbEncryptOracle2([]byte(padding+short), randPrefix))[toIgnore : toIgnore+x+blockSize]
+			for b := 0; b < 256; b++ { // loop over all UTF-8 characters
+				toTry := string(b)
+				toCheck := short + result + toTry
+				maybe := string(ecbEncryptOracle2([]byte(padding+toCheck), randPrefix)[toIgnore : toIgnore+x+blockSize])
+				if maybe == block {
+					result += toTry
+					break
+				}
+			}
+		}
+	}
+	fmt.Printf("%s\n", result)
+}
+
+// AES-128-ECB(random-prefix || attacker-controlled || target-bytes, random-key)
+func ecbEncryptOracle2(text, randPrefix []byte) []byte {
+	block, err := aes.NewCipher(fixedKey)
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	text = append(randPrefix, text...)
+	text = append(text, decodeBase64(unknownBytes)...)
+
+	return ecbEncrypt(block, text)
+}
+
+func detectEncryption2(f func(plaintext, randPrefix []byte) []byte, randPrefix []byte) string {
+	encrypted := f([]byte("AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA"), randPrefix)
+	blocks := make(map[string]bool)
+	for i := 0; i < len(encrypted); i = i + aes.BlockSize {
+		block := string(encrypted[i : i+aes.BlockSize])
+		if blocks[block] {
+			return "ECB"
+		}
+		blocks[block] = true
+	}
+	return "CBC"
+}
 
 func ex15() {}
 
